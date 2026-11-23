@@ -12,20 +12,27 @@
 [![License](https://img.shields.io/github/license/nao1215/action-readme-showcase)](./LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/nao1215/action-readme-showcase/badge)](https://scorecard.dev/viewer/?uri=github.com/nao1215/action-readme-showcase)
 
+
 # action-readme-showcase
 
-A GitHub Action that draws a card for each repository you list, plus an optional star history graph, and puts them in your README.
-
-The action reads the GitHub API, writes the cards as SVG files, and your workflow commits them to your own repository, so the README does not depend on an outside image service. Each card has a light and a dark version that follows the reader's GitHub theme.
+A GitHub Action that draws repository cards and an optional star history graph as SVG files in your own repository, and lists them in your README. Each image has a light and a dark version that follows the reader's theme.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__gup.svg"><img src="doc/img/light/nao1215__gup.svg" width="400" alt="nao1215/gup"></picture>
 <picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__sqly.svg"><img src="doc/img/light/nao1215__sqly.svg" width="400" alt="nao1215/sqly"></picture>
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/star-history-dark.svg?view=all-public-total"><img src="doc/img/star-history-light.svg?view=all-public-total" width="808" alt="Star history"></picture>
+```mermaid
+flowchart LR
+  config[".github/readme-showcase.yml"] --> action["readme-showcase"]
+  api[("GitHub API")] --> action
+  action --> svg["SVG files in cards/"]
+  action --> readme["README.md, between the markers"]
+  svg --> commit["your workflow commits both"]
+  readme --> commit
+```
 
 ## Usage
 
-Put two markers in your README. Each run replaces what is between them and leaves the rest of the file alone.
+Put two markers in your README. Each run replaces only what is between them.
 
 ```markdown
 <!-- showcase:start -->
@@ -79,9 +86,17 @@ jobs:
           git push
 ```
 
-Run the workflow once from the Actions tab to fill the README right away.
+Run the workflow once from the Actions tab to fill the README right away. It writes these files next to the README:
 
-The SVG files go to `cards/` next to the README: `cards/light/`, `cards/dark/`, and the graph as `cards/star-history-light.svg` and `cards/star-history-dark.svg`. To keep them somewhere else, set `cards-dir` to a directory relative to the README, and add the same directory in the commit step:
+```text
+cards/
+├── light/owner__repo.svg
+├── dark/owner__repo.svg
+├── star-history-light.svg
+└── star-history-dark.svg
+```
+
+To keep them elsewhere, set `cards-dir` to a directory relative to the README and add the same directory in the commit step:
 
 ```yaml
       - id: showcase
@@ -95,69 +110,128 @@ The SVG files go to `cards/` next to the README: `cards/light/`, `cards/dark/`, 
           git add README.md .github/showcase
 ```
 
-When a repository leaves the config, its card is deleted. The action only touches files named like its cards (`owner__repo.svg`) and its two graph files, so other images in the same directory are safe.
+A card is deleted when its repository leaves the config. Other files in the directory are left alone.
 
-## Awesome badge
+## Cards
 
-Name the awesome list a repository appears in, and its card gets an "awesome" badge next to the title:
+Cards come two to a row in the order you list them. These keys change a card:
+
+```yaml
+repos:
+  - name: gup
+    featured: true                              # gold border and a "featured" badge
+  - name: gozen
+    language: {name: gozen, color: "#ff5c8a"}   # label and dot color instead of GitHub's language
+  - name: markdown                              # everything from GitHub
+```
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__gup.svg"><img src="doc/img/light/nao1215__gup.svg" width="400" alt="nao1215/gup, featured"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__gozen.svg"><img src="doc/img/light/nao1215__gozen.svg" width="400" alt="nao1215/gozen with a language override"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__markdown.svg"><img src="doc/img/light/nao1215__markdown.svg" width="400" alt="nao1215/markdown"></picture>
+
+GitHub reports gozen as Go, but its users write YAML for the gozen engine, so the card shows `gozen` in the engine's color. `description` replaces the text from GitHub in the same way; backticks in it are dropped.
+
+## Sections
+
+Each group gets its title as a heading. A section with a `summary` is folded into `<details>`, like this:
 
 ```yaml
 sections:
-  - groups:
-      - title: Go CLI tools
+  - summary: More
+    groups:
+      - title: Libraries
         repos:
-          - name: gup
-            featured: true
+          - name: markdown
+```
+
+<details><summary>More</summary>
+
+### Libraries
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__markdown.svg"><img src="doc/img/light/nao1215__markdown.svg" width="400" alt="nao1215/markdown"></picture>
+
+</details>
+
+## Awesome badge
+
+Name the awesome list a repository is in, and its card gets an "awesome" badge next to the title:
+
+```yaml
+          - name: sqly
             awesome: avelino/awesome-go
 ```
 
-On each run the action reads the list's README through the GitHub API and draws the badge only if it links to `github.com/owner/repo` (case-insensitive; `gup` does not match `gup-extra`). If the link is gone, the card loses the badge and the run prints a warning. If the list cannot be read, the run fails rather than dropping badges. Each list is read once however many cards name it, and the default `${{ github.token }}` can read public lists.
+<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__sqly.svg"><img src="doc/img/light/nao1215__sqly.svg" width="400" alt="nao1215/sqly with an awesome badge"></picture>
+
+The list is checked on every run:
+
+```mermaid
+flowchart LR
+  read["Read the list's README"] --> link{"Links to github.com/owner/repo?"}
+  link -->|yes| badge["Draw the badge"]
+  link -->|no| warn["No badge, print a warning"]
+  read -->|cannot read| fail["Fail the run"]
+```
+
+The match ignores case and needs the whole name: `gup` does not match `gup-extra`. The default token can read public lists.
 
 ## Star history
-
-List the repositories to graph in `starHistory.repos`, as `repo` (under `owner`) or `owner/repo`. They do not need a card, and `featured` has no effect on the graph. Lines follow the list order, up to six repositories.
 
 ```yaml
 owner: nao1215
 starHistory:
-  repos: [gup, sqly] # individual lines
-  total: true       # all public repositories owned by nao1215
-sections:
-  ...
+  repos: [gup, sqly] # one line each, in this order
+  total: true       # one more line for all public repositories of nao1215
 ```
 
-`starHistory.total: true` (off by default) adds a `total (all public)` line: the combined star history of every public repository `owner` owns now, whether or not it is in `repos` or has a card. The graph names the owner and states this scope.
+<picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/star-history-dark.svg?view=all-public-total"><img src="doc/img/star-history-light.svg?view=all-public-total" width="808" alt="Star history"></picture>
 
-| Setting | Scope |
-| --- | --- |
-| `starHistory.repos` | Individual lines, in the listed order. `owner/repo` can select another owner's repository. |
-| `starHistory.total: true` | All public repositories owned by `owner`, including repositories absent from `repos` and the cards. Includes forks and archived repositories; excludes private repositories and other owners' repositories. |
+A graphed repository needs no card. The graph draws up to six lines, or the total and five repositories.
 
-With `total` on, the graph shows the total and up to five individual lines; the limit does not apply to what the total counts. For example, `repos: [gup, sqly]` with `owner: nao1215` shows those two lines plus the total for all of nao1215's public repositories. `owner` defaults to the account that owns the workflow repository and is never inferred from the token or from `repos`.
+`total: true` (off by default) sums the star histories of these repositories:
 
-The total adds up GitHub's daily histories of the repositories that are public today, so deleted, transferred and now-private repositories are missing from past dates too. If any listing or history request fails, the run fails instead of publishing a partial total.
+```mermaid
+flowchart LR
+  subgraph counted["Counted"]
+    pub["Every public repository owner owns today,<br>forks and archived included,<br>listed in repos or not"]
+  end
+  subgraph skipped["Not counted"]
+    priv["Private repositories"]
+    other["Other owners' repositories"]
+    gone["Deleted, transferred or now-private repositories,<br>on past dates too"]
+  end
+```
 
-The graph uses GitHub's [aggregate star history API](https://docs.github.com/en/rest/activity/starring#get-repository-star-history), which returns daily counts with Metadata read access and does not read individual stargazers.
+`owner` defaults to the account that owns the workflow repository, never to the token's account. If any request fails, the run fails instead of publishing a partial total.
 
-Upgrading from v0.1.0: add `starHistory.repos`, since the graph no longer picks repositories through `featured`, and delete `minStars`, which has been removed (every listed repository is included).
+Counts come from GitHub's [aggregate star history API](https://docs.github.com/en/rest/activity/starring#get-repository-star-history), which needs Metadata read access and does not read individual stargazers.
+
+Upgrading from v0.1.0: add `starHistory.repos`, because the graph no longer picks repositories through `featured`, and delete `minStars`, which was removed.
 
 ### Token setup
 
-For public repositories the default `${{ github.token }}` is enough, and the workflow in Usage needs no extra secret. Do not pass `with.token` from a secret that does not exist: the empty input overrides the default token.
+The action needs read access only. Pushing uses the workflow's own credentials:
 
-To use a fine-grained personal access token instead, follow these steps. The example graphs `gup`, `sqly`, `filesql`, and `markdown` owned by `nao1215`.
+```mermaid
+flowchart LR
+  token["with.token: github.token or a PAT"] -->|reads| api[("GitHub API")]
+  checkout["actions/checkout with contents: write"] -->|pushes| repo["your repository"]
+```
 
-1. Open [Settings > Developer settings > Fine-grained tokens](https://github.com/settings/personal-access-tokens/new).
-2. Name the token, pick an expiration date, and set Resource owner to `nao1215` (your own account for your repositories).
-3. Under Repository access, choose Only select repositories and select all four graphed repositories. The profile repository `nao1215/nao1215` alone is not enough.
-4. Under Repository permissions, keep Metadata: Read-only, which GitHub usually adds itself. The graph needs no Contents write or User permissions.
-5. Generate and copy the token. In the repository that runs the workflow (`nao1215/nao1215` here), open Settings > Secrets and variables > Actions > New repository secret and save it as `STARS_TOKEN`, or run this and paste the token at the prompt:
+For public repositories the default `${{ github.token }}` is enough. Do not pass `with.token` from a missing secret: the empty value replaces the default token.
+
+To use a fine-grained personal access token instead (this example graphs `gup`, `sqly`, `filesql` and `markdown` owned by `nao1215`):
+
+1. Open [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) and set Resource owner to `nao1215`.
+2. Under Repository access, select all four graphed repositories. The profile repository `nao1215/nao1215` alone is not enough.
+3. Keep Repository permissions at Metadata: Read-only. No write permission is needed.
+4. Generate the token and save it as the `STARS_TOKEN` secret of the repository that runs the workflow:
 
    ```shell
    gh secret set STARS_TOKEN --repo nao1215/nao1215
    ```
 
-6. Pass the secret to the action in the workflow:
+5. Pass the secret to the action:
 
    ```yaml
    - id: showcase
@@ -166,11 +240,7 @@ To use a fine-grained personal access token instead, follow these steps. The exa
        token: ${{ secrets.STARS_TOKEN }}
    ```
 
-With `total: true` the action also reads the histories of all of `owner`'s public repositories, so a PAT limited to the graphed repositories is not enough: its Metadata read access must cover every public repository in the total.
-
-The PAT only reads. The commit step uses the workflow's `permissions: contents: write` and the credentials from `actions/checkout`.
-
-After replacing an expired or regenerated token, update the `STARS_TOKEN` secret and rerun the failed job. Editing the permissions of an existing PAT keeps the same token value.
+With `total: true` the PAT must also cover every public repository in the total. After regenerating a token, update the secret and rerun the job.
 
 ### If token setup fails
 
@@ -181,25 +251,25 @@ After replacing an expired or regenerated token, update the `STARS_TOKEN` secret
 | HTTP 403 from `/stargazers/history` | Check the PAT's resource owner, selected graph repositories, Metadata read permission, and any organization approval requirement. |
 | HTTP 403 from `/stargazers` on v0.1.0 | Upgrade to v0.2.0 or later. v0.1.0 uses the restricted individual-stargazer API; adding write permissions is unnecessary with the aggregate API. |
 
-Each run makes one GraphQL request for card and graph metadata, plus paginated REST history requests of up to 30 weeks per page. With `total: true` it also lists all public repositories (100 per page) and fetches their histories, reusing those already fetched for individual lines, so accounts with many repositories take more requests and time.
+A run makes one GraphQL request, plus REST pages of star history (30 weeks each). With `total: true` it also reads every public repository's history, so large accounts take longer.
 
 ## Config
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `owner` | owner of the repository running the workflow | Owner for names written without `owner/`. |
-| `starHistory.repos` | required with `starHistory` | Repository names in graph order, independent of cards and `featured`. |
-| `starHistory.total` | `false` | Add `total (all public)` for all public repositories owned by `owner`, including forks and archived repositories, independently of `starHistory.repos`. |
+| `starHistory.repos` | required with `starHistory` | `repo` or `owner/repo` in graph order, independent of cards and `featured`. |
+| `starHistory.total` | `false` | Add a line for all public repositories of `owner`. |
 | `starHistory.position` | `top` | `top` puts the graph above the cards; `bottom` puts it below them. |
 | `sections[].summary` | none | Folds the section into `<details>` with this summary. |
 | `sections[].groups[].title` | required | Heading above the cards. |
 | `repos[].name` | required | `repo` or `owner/repo`. |
 | `repos[].description` | GitHub description | Text on the card. Backticks are dropped. |
 | `repos[].featured` | `false` | Gold border and a "featured" badge. |
-| `repos[].awesome` | none | An awesome list as `owner/repo`, such as `avelino/awesome-go`. The card shows an "awesome" badge while that list's README links to the repository. |
+| `repos[].awesome` | none | Awesome list as `owner/repo`; draws the badge while the list links here. |
 | `repos[].language` | GitHub primary language | `{name: gozen, color: "#ff5c8a"}` to override the label and dot color. |
 
-Cards come two to a row in the order you list them. A misspelled key is an error. JSON works too, since it is valid YAML.
+A misspelled key is an error. JSON works too, since it is valid YAML.
 
 ## Inputs
 
@@ -220,7 +290,14 @@ Cards come two to a row in the order you list them. A misspelled key is an error
 
 ## How it runs
 
-The action downloads the prebuilt `readme-showcase` binary for the runner (Linux, macOS, or Windows on amd64 or arm64) from this repository's release, checks it against `checksums.txt`, and runs it. `@v0` resolves to the newest `v0.x.y` release. A branch or commit SHA reference builds the binary from source with the Go in GitHub's runner images (on PATH, or in the tool cache on macOS).
+```mermaid
+flowchart LR
+  ref{"uses: nao1215/action-readme-showcase@ref"} -->|"release tag; @v0 is the newest v0.x.y"| download["Download the binary for the runner"]
+  download --> verify["Check it against checksums.txt"] --> run["Run"]
+  ref -->|"branch or commit SHA"| build["Build from source with the runner's Go"] --> run
+```
+
+Prebuilt binaries cover Linux, macOS and Windows on amd64 and arm64.
 
 The binary also runs outside Actions:
 
