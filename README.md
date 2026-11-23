@@ -188,19 +188,11 @@ starHistory:
 
 A graphed repository needs no card. The graph draws up to six lines, or the total and five repositories.
 
-`total: true` (off by default) sums the star histories of every public repository `owner` owns today, whether or not it is in `repos`. Deleted, transferred and now-private repositories are missing from past dates too:
+`total: true` (off by default) adds one line that sums these star histories:
 
-```mermaid
-flowchart LR
-  subgraph counted["Counted"]
-    pub["Public repos<br>of owner,<br>with forks and<br>archived ones"]
-  end
-  subgraph skipped["Not counted"]
-    priv["Private repos"]
-    other["Other owners"]
-    gone["Deleted, moved or<br>now private repos"]
-  end
-```
+- Counted: every public repository `owner` owns today, including forks and archived repositories, whether or not it is in `repos`.
+- Not counted: private repositories and other owners' repositories.
+- Not counted, on past dates too: deleted, transferred and now-private repositories.
 
 `owner` defaults to the account that owns the workflow repository, never to the token's account. If any request fails, the run fails instead of publishing a partial total.
 
