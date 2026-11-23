@@ -22,11 +22,11 @@ A GitHub Action that draws repository cards and an optional star history graph a
 
 ```mermaid
 flowchart LR
-  config[".github/readme-showcase.yml"] --> action["readme-showcase"]
+  config["readme-showcase.yml"] --> action["action"]
   api[("GitHub API")] --> action
-  action --> svg["SVG files in cards/"]
-  action --> readme["README.md, between the markers"]
-  svg --> commit["your workflow commits both"]
+  action --> svg["cards/*.svg"]
+  action --> readme["README.md"]
+  svg --> commit["git commit"]
   readme --> commit
 ```
 
@@ -163,14 +163,14 @@ Name the awesome list a repository is in, and its card gets an "awesome" badge n
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="doc/img/dark/nao1215__sqly.svg"><img src="doc/img/light/nao1215__sqly.svg" width="400" alt="nao1215/sqly with an awesome badge"></picture>
 
-The list is checked on every run:
+On every run the action reads the list's README and looks for a link to `github.com/owner/repo`:
 
 ```mermaid
-flowchart LR
-  read["Read the list's README"] --> link{"Links to github.com/owner/repo?"}
-  link -->|yes| badge["Draw the badge"]
-  link -->|no| warn["No badge, print a warning"]
-  read -->|cannot read| fail["Fail the run"]
+flowchart TD
+  read["Read the list"] --> link{"Links to<br>the repo?"}
+  link -->|yes| badge["Badge"]
+  link -->|no| warn["No badge,<br>warning"]
+  read -->|error| fail["Run fails"]
 ```
 
 The match ignores case and needs the whole name: `gup` does not match `gup-extra`. The default token can read public lists.
@@ -188,17 +188,17 @@ starHistory:
 
 A graphed repository needs no card. The graph draws up to six lines, or the total and five repositories.
 
-`total: true` (off by default) sums the star histories of these repositories:
+`total: true` (off by default) sums the star histories of every public repository `owner` owns today, whether or not it is in `repos`. Deleted, transferred and now-private repositories are missing from past dates too:
 
 ```mermaid
 flowchart LR
   subgraph counted["Counted"]
-    pub["Every public repository owner owns today,<br>forks and archived included,<br>listed in repos or not"]
+    pub["Public repos<br>of owner,<br>with forks and<br>archived ones"]
   end
   subgraph skipped["Not counted"]
-    priv["Private repositories"]
-    other["Other owners' repositories"]
-    gone["Deleted, transferred or now-private repositories,<br>on past dates too"]
+    priv["Private repos"]
+    other["Other owners"]
+    gone["Deleted, moved or<br>now private repos"]
   end
 ```
 
@@ -210,12 +210,12 @@ Upgrading from v0.1.0: add `starHistory.repos`, because the graph no longer pick
 
 ### Token setup
 
-The action needs read access only. Pushing uses the workflow's own credentials:
+`with.token` (the default `github.token` or a PAT) only reads. Pushing uses the credentials from `actions/checkout` and the workflow's `contents: write`:
 
 ```mermaid
 flowchart LR
-  token["with.token: github.token or a PAT"] -->|reads| api[("GitHub API")]
-  checkout["actions/checkout with contents: write"] -->|pushes| repo["your repository"]
+  token["with.token"] -->|reads| api[("GitHub API")]
+  checkout["actions/checkout"] -->|pushes| repo["your repo"]
 ```
 
 For public repositories the default `${{ github.token }}` is enough. Do not pass `with.token` from a missing secret: the empty value replaces the default token.
@@ -292,12 +292,11 @@ A misspelled key is an error. JSON works too, since it is valid YAML.
 
 ```mermaid
 flowchart LR
-  ref{"uses: nao1215/action-readme-showcase@ref"} -->|"release tag; @v0 is the newest v0.x.y"| download["Download the binary for the runner"]
-  download --> verify["Check it against checksums.txt"] --> run["Run"]
-  ref -->|"branch or commit SHA"| build["Build from source with the runner's Go"] --> run
+  ref{"@ref"} -->|tag| download["Download"] --> verify["Verify<br>checksum"] --> run["Run"]
+  ref -->|branch or SHA| build["go build"] --> run
 ```
 
-Prebuilt binaries cover Linux, macOS and Windows on amd64 and arm64.
+A release tag downloads the prebuilt binary for the runner (Linux, macOS or Windows on amd64 or arm64) and checks it against `checksums.txt`; `@v0` is the newest `v0.x.y`. A branch or commit SHA builds from source with the runner's Go.
 
 The binary also runs outside Actions:
 
